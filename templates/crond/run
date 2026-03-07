@@ -1,0 +1,4 @@
+#!/bin/sh
+# s6-overlay run script for crond
+# Runs crond in foreground (-f) with log level 2 (-l 2)
+exec /usr/sbin/crond -f -l 2

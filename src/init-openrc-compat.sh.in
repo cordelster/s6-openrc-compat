@@ -1,0 +1,49 @@
+#!/bin/sh
+# Initialize OpenRC compatibility layer for s6-overlay
+# Creates /etc/init.d symlinks for all s6 services
+
+set -e
+
+S6_SERVICE_DIR="@S6_SERVICE_DIR@"
+INIT_DIR="@INITDIR@"
+RC_SERVICE="@BINDIR@/rc-service"
+RUNLEVELDIR="@RUNLEVELDIR@"
+
+# Create init.d directory
+mkdir -p "$INIT_DIR"
+
+# Create a generic init script wrapper that calls rc-service
+create_init_script() {
+    local service="$1"
+    local script="$INIT_DIR/$service"
+
+    cat > "$script" <<EOF
+#!/bin/sh
+# Auto-generated init script for s6 service compatibility
+SERVICE="\$(basename "\$0")"
+ACTION="\${1:-status}"
+exec "$RC_SERVICE" "\$SERVICE" "\$ACTION"
+EOF
+    chmod +x "$script"
+}
+
+# Create init scripts for all s6 services
+for service_dir in "$S6_SERVICE_DIR"/*; do
+    if [ -d "$service_dir" ]; then
+        service=$(basename "$service_dir")
+        create_init_script "$service"
+    fi
+done
+
+# Create standard runlevel symlinks
+mkdir -p "$RUNLEVELDIR"/{boot,default,shutdown,sysinit}
+
+# Link all services to default runlevel
+for service_dir in "$S6_SERVICE_DIR"/*; do
+    if [ -d "$service_dir" ]; then
+        service=$(basename "$service_dir")
+        ln -sf "$S6_SERVICE_DIR/$service" "$RUNLEVELDIR/default/$service" 2>/dev/null || true
+    fi
+done
+
+echo "OpenRC compatibility layer initialized"

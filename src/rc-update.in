@@ -1,0 +1,83 @@
+#!/bin/sh
+# Stub rc-update for s6-overlay compatibility with ACF
+# Maps rc-update commands to s6 service discovery
+
+set -e
+
+S6_SERVICE_DIR="@S6_SERVICE_DIR@"
+RUNLEVELS_DIR="@RUNLEVELDIR@"
+
+# Ensure runlevels directory structure exists
+mkdir -p "$RUNLEVELS_DIR/boot" "$RUNLEVELS_DIR/default" "$RUNLEVELS_DIR/shutdown" "$RUNLEVELS_DIR/sysinit"
+
+case "$1" in
+    show)
+        # List all s6 services and their "runlevels"
+        if [ "$2" = "-v" ]; then
+            # Verbose mode: show service and runlevels
+            for service_dir in "$S6_SERVICE_DIR"/*; do
+                if [ -d "$service_dir" ]; then
+                    service=$(basename "$service_dir")
+                    # All s6 services are considered to be in "default" runlevel
+                    echo "$service | default"
+                fi
+            done
+        else
+            # Simple mode: just list services with their runlevels
+            for service_dir in "$S6_SERVICE_DIR"/*; do
+                if [ -d "$service_dir" ]; then
+                    service=$(basename "$service_dir")
+                    echo "$service | default"
+                fi
+            done
+        fi
+        ;;
+    add)
+        # Add service to runlevel (no-op for s6, services are always enabled)
+        SERVICE="$2"
+        shift 2
+        RUNLEVELS="$*"
+        if [ -z "$SERVICE" ]; then
+            echo "Usage: rc-update add <service> [runlevel...]" >&2
+            exit 1
+        fi
+        if [ ! -d "$S6_SERVICE_DIR/$SERVICE" ]; then
+            echo "Service $SERVICE not found in $S6_SERVICE_DIR" >&2
+            exit 1
+        fi
+        # Create symlinks in runlevels directory for compatibility
+        for runlevel in $RUNLEVELS; do
+            if [ -z "$runlevel" ]; then
+                runlevel="default"
+            fi
+            mkdir -p "$RUNLEVELS_DIR/$runlevel"
+            ln -sf "$S6_SERVICE_DIR/$SERVICE" "$RUNLEVELS_DIR/$runlevel/$SERVICE" 2>/dev/null || true
+        done
+        echo " * service $SERVICE added to runlevel(s) ${RUNLEVELS:-default}"
+        ;;
+    del|delete)
+        # Remove service from runlevel (no-op for s6)
+        SERVICE="$2"
+        shift 2
+        RUNLEVELS="$*"
+        if [ -z "$SERVICE" ]; then
+            echo "Usage: rc-update del <service> [runlevel...]" >&2
+            exit 1
+        fi
+        # Remove symlinks from runlevels directory
+        for runlevel in $RUNLEVELS; do
+            if [ -z "$runlevel" ]; then
+                runlevel="default"
+            fi
+            rm -f "$RUNLEVELS_DIR/$runlevel/$SERVICE" 2>/dev/null || true
+        done
+        echo " * service $SERVICE removed from runlevel(s) ${RUNLEVELS:-default}"
+        ;;
+    *)
+        echo "Usage: rc-update {show|add|del} [options]" >&2
+        echo "This is a stub implementation for s6-overlay compatibility" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

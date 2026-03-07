@@ -1,0 +1,38 @@
+#!/bin/sh
+# Stub rc-status for s6-overlay compatibility with ACF
+
+S6_SERVICE_DIR="@S6_SERVICE_DIR@"
+RUN_SERVICE_DIR="@S6_RUN_DIR@"
+
+echo "Runlevel: default"
+
+# List all supervised services
+if [ -d "$S6_SERVICE_DIR" ]; then
+    for service in "$S6_SERVICE_DIR"/*; do
+        if [ -d "$service" ]; then
+            name=$(basename "$service")
+            status="stopped"
+            
+            # Check if actually running in s6 runtime dir
+            if [ -d "$RUN_SERVICE_DIR/$name" ]; then
+                if s6-svstat "$RUN_SERVICE_DIR/$name" 2>&1 | grep -q "up"; then
+                    status="started"
+                fi
+            fi
+            
+            # Format like OpenRC: " service [ status ]"
+            printf " %-20s [  %s  ]
+" "$name" "$status"
+        fi
+    done
+fi
+
+# Special handling for crond if it's running but not in s6
+if pgrep -x crond >/dev/null; then
+    if ! [ -d "$S6_SERVICE_DIR/crond" ]; then
+        printf " %-20s [  %s  ]
+" "crond" "started"
+    fi
+fi
+
+exit 0
