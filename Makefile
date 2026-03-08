@@ -1,5 +1,5 @@
 PACKAGE    = s6-openrc-compat
-VERSION    = 0.1.0
+VERSION    ?= 0.1.0
 
 include config.mk
 
