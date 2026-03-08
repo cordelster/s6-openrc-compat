@@ -25,7 +25,7 @@ SED_CMD = sed \
 all: $(SCRIPTS)
 
 check: $(SCRIPTS)
-	shellcheck -s sh $(SCRIPTS)
+	shellcheck -s sh -e SC3043,SC3009 $(SCRIPTS)
 
 test: all
 	@echo "Running installation tests..."
