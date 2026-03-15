@@ -9,7 +9,6 @@ This module provides stubs for `rc-service`, `rc-update`, and `rc-status` that m
 - **rc-service stub**: Supports `start`, `stop`, `restart`, and `status`. Handles `crond` specifically even if not supervised by s6.
 - **rc-status stub**: Provides a bird's-eye view of all s6 services in OpenRC format.
 - **rc-update stub**: Simulates runlevel management for package compatibility.
-- **s6-dumpenv**: Exports s6 container environment variables for use by cron jobs.
 - **Initialization script**: Automatically creates `/etc/init.d` wrappers for all s6 services.
 - **crond template**: A ready-to-use s6 service definition for running `crond` in the foreground.
 
@@ -37,17 +36,14 @@ Run this during container start-up (e.g., in `cont-init.d`):
 ```
 
 ### 2. Use with Cron
-To allow cron jobs to access container environment variables (like those from Docker or Home Assistant):
+Use the provided `templates/crond` to ensure `crond` is supervised by s6.
 
-1. Run `s6-dumpenv` during initialization.
-2. Source `/etc/environment.s6` in your cron scripts:
-   ```bash
-   #!/bin/sh
-   . /etc/environment.s6
-   # now you can use $MY_VARIABLE
-   ```
-
-3. Use the provided `templates/crond` to ensure `crond` is supervised by s6.
+To expose container environment variables to cron jobs, use the `s6-dumpenv` binary provided by s6-overlay directly during initialization:
+```sh
+s6-dumpenv -- /run/s6/container_environment | grep -vE '^(S6_|BASHIO_|PATH=)' > /etc/environment.s6
+echo "PATH=$PATH" >> /etc/environment.s6
+```
+Then source `/etc/environment.s6` in your cron scripts.
 
 ## ACF Compatibility
 This module is specifically designed to prevent "popen failed" errors in ACF Lua modules by providing valid responses to service status queries.
