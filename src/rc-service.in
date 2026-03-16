@@ -2,8 +2,21 @@
 # Stub rc-service for s6-overlay compatibility with ACF
 # Maps rc-service commands to s6-svc commands
 
-S6_SERVICE_DIR="@S6_RUN_DIR@"
 SERVICE_DEF_DIR="@S6_SERVICE_DIR@"
+
+# Detect s6 binary location - HA base image uses /package/admin/s6/command
+if [ -x "/package/admin/s6/command/s6-svc" ]; then
+    _s6_bin="/package/admin/s6/command"
+else
+    _s6_bin="/usr/bin"
+fi
+
+# Detect s6 supervise dir - HA s6-overlay uses /run/s6/legacy-services
+if [ -d "/run/s6/legacy-services" ]; then
+    _s6_run="/run/s6/legacy-services"
+else
+    _s6_run="@S6_RUN_DIR@"
+fi
 
 if [ $# -lt 2 ]; then
     echo "Usage: rc-service <service> <action>" >&2
@@ -46,7 +59,7 @@ if [ ! -d "$SERVICE_DEF_DIR/$SERVICE" ]; then
         echo " * status: stopped"
         exit 0
     fi
-    
+
     # For other actions on non-existent services, report error
     echo "Service $SERVICE not found" >&2
     exit 1
@@ -54,9 +67,8 @@ fi
 
 case "$ACTION" in
     start)
-        # s6 services are always running, but we can send a restart signal
-        if [ -d "$S6_SERVICE_DIR/$SERVICE" ]; then
-            s6-svc -u "$S6_SERVICE_DIR/$SERVICE"
+        if [ -d "$_s6_run/$SERVICE" ]; then
+            "$_s6_bin"/s6-svc -u "$_s6_run/$SERVICE"
             echo " * Starting $SERVICE ..."
         else
             echo "Service $SERVICE not supervised by s6" >&2
@@ -64,9 +76,8 @@ case "$ACTION" in
         fi
         ;;
     stop)
-        # Stop the service (s6 will restart it if it's supervised)
-        if [ -d "$S6_SERVICE_DIR/$SERVICE" ]; then
-            s6-svc -d "$S6_SERVICE_DIR/$SERVICE"
+        if [ -d "$_s6_run/$SERVICE" ]; then
+            "$_s6_bin"/s6-svc -d "$_s6_run/$SERVICE"
             echo " * Stopping $SERVICE ..."
         else
             echo "Service $SERVICE not supervised by s6" >&2
@@ -74,9 +85,8 @@ case "$ACTION" in
         fi
         ;;
     restart)
-        # Restart the service (s6-svc -t sends SIGTERM and s6 restarts)
-        if [ -d "$S6_SERVICE_DIR/$SERVICE" ]; then
-            s6-svc -t "$S6_SERVICE_DIR/$SERVICE"
+        if [ -d "$_s6_run/$SERVICE" ]; then
+            "$_s6_bin"/s6-svc -t "$_s6_run/$SERVICE"
             echo " * Restarting $SERVICE ..."
         else
             echo "Service $SERVICE not supervised by s6" >&2
@@ -84,9 +94,8 @@ case "$ACTION" in
         fi
         ;;
     reload)
-        # Reload the service (s6-svc -h sends SIGHUP)
-        if [ -d "$S6_SERVICE_DIR/$SERVICE" ]; then
-            s6-svc -h "$S6_SERVICE_DIR/$SERVICE"
+        if [ -d "$_s6_run/$SERVICE" ]; then
+            "$_s6_bin"/s6-svc -h "$_s6_run/$SERVICE"
             echo " * Reloading $SERVICE configuration ..."
         else
             echo "Service $SERVICE not supervised by s6" >&2
@@ -94,20 +103,18 @@ case "$ACTION" in
         fi
         ;;
     status)
-        # Check service status via s6-svstat
-        if [ -d "$S6_SERVICE_DIR/$SERVICE" ]; then
-            STATUS=$(s6-svstat "$S6_SERVICE_DIR/$SERVICE" 2>&1)
+        if [ -d "$_s6_run/$SERVICE" ]; then
+            STATUS=$("$_s6_bin"/s6-svstat "$_s6_run/$SERVICE" 2>&1)
             if echo "$STATUS" | grep -q "up"; then
                 echo " * status: started"
             else
                 echo " * status: stopped"
             fi
         else
-            # Try pgrep as fallback
             if pgrep -x "$SERVICE" >/dev/null; then
-                 echo " * status: started"
+                echo " * status: started"
             else
-                 echo " * status: stopped"
+                echo " * status: stopped"
             fi
         fi
         ;;

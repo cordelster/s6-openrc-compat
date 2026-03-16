@@ -2,7 +2,20 @@
 # Stub rc-status for s6-overlay compatibility with ACF
 
 S6_SERVICE_DIR="@S6_SERVICE_DIR@"
-RUN_SERVICE_DIR="@S6_RUN_DIR@"
+
+# Detect s6 binary location - HA base image uses /package/admin/s6/command
+if [ -x "/package/admin/s6/command/s6-svstat" ]; then
+    _s6_bin="/package/admin/s6/command"
+else
+    _s6_bin="/usr/bin"
+fi
+
+# Detect s6 supervise dir - HA s6-overlay uses /run/s6/legacy-services
+if [ -d "/run/s6/legacy-services" ]; then
+    _s6_run="/run/s6/legacy-services"
+else
+    _s6_run="@S6_RUN_DIR@"
+fi
 
 echo "Runlevel: default"
 
@@ -12,17 +25,15 @@ if [ -d "$S6_SERVICE_DIR" ]; then
         if [ -d "$service" ]; then
             name=$(basename "$service")
             status="stopped"
-            
+
             # Check if actually running in s6 runtime dir
-            if [ -d "$RUN_SERVICE_DIR/$name" ]; then
-                if s6-svstat "$RUN_SERVICE_DIR/$name" 2>&1 | grep -q "up"; then
+            if [ -d "$_s6_run/$name" ]; then
+                if "$_s6_bin"/s6-svstat "$_s6_run/$name" 2>&1 | grep -q "up"; then
                     status="started"
                 fi
             fi
-            
-            # Format like OpenRC: " service [ status ]"
-            printf " %-20s [  %s  ]
-" "$name" "$status"
+
+            printf " %-20s [  %s  ]\n" "$name" "$status"
         fi
     done
 fi
@@ -30,8 +41,7 @@ fi
 # Special handling for crond if it's running but not in s6
 if pgrep -x crond >/dev/null; then
     if ! [ -d "$S6_SERVICE_DIR/crond" ]; then
-        printf " %-20s [  %s  ]
-" "crond" "started"
+        printf " %-20s [  %s  ]\n" "crond" "started"
     fi
 fi
 
